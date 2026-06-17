@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 pydantic
 pydantic-settings
+email-validator
 sqlalchemy
 alembic
 psycopg[binary]
@@ -10,4 +11,3 @@ passlib[bcrypt]
 python-multipart
 pytest
 httpx
-
