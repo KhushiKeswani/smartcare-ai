@@ -50,7 +50,7 @@ export default function PatientMedicalRecordsPage() {
                 <p className="text-sm text-slate-600">{item.visit_date}</p>
                 <h2 className="mt-1 text-lg font-semibold text-slate-950">{item.diagnosis}</h2>
                 <p className="mt-1 text-sm text-slate-700">
-                  {item.department} · {item.doctor_name}
+                  {item.department} - {item.doctor_name}
                 </p>
                 {item.notes ? <p className="mt-3 text-sm text-slate-700">{item.notes}</p> : null}
               </li>
