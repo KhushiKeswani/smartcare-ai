@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node tests/unit/auth.test.mjs && node tests/unit/patient.test.mjs"
+    "test": "node tests/unit/auth.test.mjs && node tests/unit/patient.test.mjs && node tests/unit/doctor.test.mjs"
   },
   "dependencies": {
     "next": "^15.0.0",
