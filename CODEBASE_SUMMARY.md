@@ -1,576 +1,525 @@
 # SmartCare AI — Codebase Summary
 
-> Generated from repository analysis on 2026-06-26. This document reflects **what exists in code today**, cross-referenced with project documentation (`skills.md`, `prd.md`, `docs/architecture.md`, `docs/ui_wireframes.md`, `project_context.md`, `ai_memory.md`).
+> Generated from repository analysis on 2026-06-27. This document reflects **what exists in code today** and highlights gaps against product documentation (`prd.md`, `skills.md`, `ROADMAP.md`, `docs/*`, `project_context.md`, `ai_memory.md`).
 
 ---
 
-## 1. Project Architecture
+## 1. Project Overview
 
-### 1.1 High-Level Design
+**SmartCare AI** is a **Smart Hospital Management System** intended to digitize core hospital workflows and extend them with AI-assisted features. The product targets multiple staff roles and patient self-service, including:
 
-SmartCare AI is a **modular monolith** hospital management platform targeting deployment on **Vercel (frontend)** and **Railway (backend + PostgreSQL)**. The intended architecture follows clean layering:
+- Patient registration + profile + medical history
+- Doctor profiles + scheduling (planned/partial)
+- Appointment booking (planned/partial)
+- Queue management (planned)
+- Billing and receipts (planned)
+- Full EHR expansion (planned)
+- AI features (planned): symptom analysis, report summarization, queue prediction, chatbot, workload optimization, no-show prediction
 
-```
-Browser (Web / Mobile)
-        │
-        ▼
-Next.js 15 Frontend (Presentation)
-        │  HTTPS REST / JSON
-        ▼
-FastAPI Backend (API + Application + Domain + Infrastructure)
-        │
-        ├── PostgreSQL (transactional data)
-        ├── Object Storage (planned — medical documents)
-        ├── Gemini API (planned — AI features)
-        └── Notification providers (planned)
-```
-
-### 1.2 Request Flow (Implemented)
-
-```
-Next.js page / service
-  → fetch() to /api/v1/*
-    → FastAPI router (auth.py | patients.py)
-      → require_roles() JWT middleware
-        → Service (AuthService | PatientService)
-          → Repository (UserRepository | PatientRepository)
-            → In-memory users OR PostgreSQL (patients)
-```
-
-### 1.3 Current Implementation Status
-
-| Layer | Status |
-|-------|--------|
-| Frontend (Next.js 15, TypeScript, Tailwind) | Partial — auth + patient flows only |
-| Backend (FastAPI, SQLAlchemy) | Partial — auth + patient APIs |
-| Database (PostgreSQL) | Partial — `patients` and `patient_medical_history` tables |
-| JWT + RBAC | Implemented (3 roles: Patient, Doctor, Admin) |
-| AI (Gemini) | Not implemented |
-| Docker | PostgreSQL service only via `docker/docker-compose.yml` |
-| CI/CD | Not present in repo |
-
-### 1.4 Authentication Model
-
-- **JWT bearer tokens** (HS256) issued on login; 30-minute expiry (configurable via `ACCESS_TOKEN_EXPI_MINUTES`).
-- **Role-based access control** enforced via FastAPI dependency `require_roles()`.
-- Frontend stores token and user in `localStorage` (`smartcare_token`, `smartcare_user`).
-- Users are currently **hardcoded in memory** in `UserRepository` (not persisted to PostgreSQL).
+Current repository state is an early MVP foundation with **Authentication** and **Patient Management** implemented end-to-end (backend + some frontend), plus **Doctor + Appointment** backend foundations that exist as code but are not reflected in the frontend routes as complete module UX.
 
 ---
 
-## 2. Folder Structure
+## 2. Technology Stack
 
-### 2.1 Actual Repository Layout
+### Frontend
+- **Next.js 15 (App Router)**
+- **React**
+- **TypeScript**
+- **TailwindCSS**
 
-```
-smartcare-ai/
-├── backend/
-│   ├── app/
-│   │   ├── api/v1/           # auth.py, patients.py
-│   │   ├── core/             # config.py, security.py
-│   │   ├── database/         # base.py, session.py, migrations/
-│   │   ├── models/           # patient.py
-│   │   ├── repositories/     # user_repository.py, patient_repository.py
-│   │   ├── schemas/          # auth.py, patient.py
-│   │   ├── services/         # auth_service.py, patient_service.py
-│   │   └── main.py
-│   ├── tests/                # test_auth.py, test_patients.py
-│   ├── alembic.ini
-│   ├── Dockerfile
-│   ├── pyproject.toml
-│   └── requirements.txt
-├── docker/
-│   ├── docker-compose.yml    # PostgreSQL 16 only
-│   └── README.md
-├── docs/
-│   ├── architecture.md
-│   ├── structure.md          # Target/planned structure (not fully built)
-│   └── ui_wireframes.md
-├── frontend/
-│   ├── app/
-│   │   ├── (auth)/login/
-│   │   ├── (patient)/dashboard/, profile/, medical-records/
-│   │   ├── (admin)/patients/, patients/register/
-│   │   ├── globals.css, layout.tsx, page.tsx
-│   ├── lib/                  # auth.ts, config.ts, patient.ts
-│   ├── services/             # auth.service.ts, patient.service.ts
-│   ├── types/                # auth.ts, patient.ts, api.ts
-│   ├── tests/unit/           # auth.test.mjs, patient.test.mjs
-│   ├── middleware.ts         # Empty matcher (no route protection)
-│   ├── Dockerfile
-│   └── package.json
-├── ai_memory.md
-├── project_context.md
-├── prd.md
-├── skills.md
-├── .env.example
-├── .gitignore
-├── LICENSE
-└── README.md
-```
+### Backend
+- **FastAPI**
+- **Python**
+- **Pydantic v2** (request/response schemas)
+- **JWT auth + RBAC** via FastAPI dependencies
 
-### 2.2 Documented but Not Present
+### Database
+- **SQLAlchemy ORM**
+- **Alembic** migrations configured (one migration present)
+- **PostgreSQL (target)**
+- **SQLite in-memory** used for backend tests
 
-The following are described in `docs/structure.md`, `prd.md`, or `project_context.md` but **do not exist in the repo yet**:
+### Authentication
+- **JWT bearer tokens**
+- **Roles**: `Patient`, `Doctor`, `Admin`
+- RBAC enforced with `require_roles()` dependency
+- Frontend stores token in `localStorage` (`smartcare_token`) and user in `localStorage` (`smartcare_user`)
 
-| Path | Purpose |
-|------|---------|
-| `docs/database.md` | Referenced in `project_context.md` — **file missing** |
-| `docs/ui-wireframes.md` | Requested name; actual file is `docs/ui_wireframes.md` |
-| `database/` | Standalone migrations, seeds, schema |
-| `prompts/` | AI prompt templates |
-| `scripts/` | Dev setup, migrate, seed scripts |
-| `.github/workflows/` | CI/CD pipelines |
-| `frontend/components/` | Shared UI components |
-| `frontend/features/` | Feature modules |
-| `frontend/hooks/` | React hooks |
-| `backend/app/integrations/` | Gemini, email, SMS, storage |
-| `backend/app/workers/` | Background jobs |
-| Most backend API modules | doctors, appointments, queues, billing, ai, admin |
-| Doctor and admin route groups (most pages) | See Frontend Pages section |
+### Testing
+- Backend: **pytest** + **FastAPI TestClient** + SQLite override
+- Frontend: utility-level tests (Node `.mjs` unit tests) under `frontend/tests/*`
+
+### Deployment
+- Target: **Vercel** for frontend
+- Target: **Railway** for backend + database
+- Docker Compose present for local PostgreSQL
 
 ---
 
-## 3. Implemented Modules
+## 3. Folder Structure
 
-### 3.1 Authentication
+### Top-level
+- `README.md`: general overview (and roadmap excerpts)
+- `prd.md`: functional requirements and full module checklist
+- `skills.md`: engineering standards and target architecture practices
+- `ROADMAP.md`: module status and recommended implementation order
+- `project_context.md`, `ai_memory.md`: project progress notes
 
-**Backend**
+### Backend (`backend/`)
+- `app/main.py`: FastAPI app entry point; includes routers under `/api/v1`
+- `app/api/v1/`: **versioned route modules**
+  - `auth.py`, `patients.py`, `doctors.py`, `appointments.py`
+- `app/core/`: security + config
+  - `security.py`: JWT + password hashing + RBAC dependency
+  - `config.py`: settings via environment variables
+- `app/database/`:
+  - `base.py`: SQLAlchemy declarative base
+  - `session.py`: DB session / `get_db()` dependency
+  - `migrations/`: Alembic revisions
+- `app/models/`: SQLAlchemy models
+  - `patient.py`, `doctor.py`, `appointment.py`
+- `app/schemas/`: Pydantic request/response models
+- `app/repositories/`: persistence layer (SQLAlchemy operations)
+- `app/services/`: business logic layer
+- `tests/`: backend tests (unit/integration style)
 
-| Component | File | Notes |
-|-----------|------|-------|
-| Login endpoint | `backend/app/api/v1/auth.py` | `POST /api/v1/auth/login` |
-| Current user | `backend/app/api/v1/auth.py` | `GET /api/v1/auth/me` |
-| RBAC demo route | `backend/app/api/v1/auth.py` | `GET /api/v1/auth/admin-only` |
-| Auth service | `backend/app/services/auth_service.py` | Credential validation, token issuance |
-| Security | `backend/app/core/security.py` | PBKDF2-SHA256 hashing, JWT create/decode, `require_roles()` |
-| User repository | `backend/app/repositories/user_repository.py` | In-memory demo users |
-| Schemas | `backend/app/schemas/auth.py` | LoginRequest, TokenResponse, AuthenticatedUser |
-| Tests | `backend/tests/test_auth.py` | Login, RBAC allow/deny |
-
-**Frontend**
-
-| Component | File | Notes |
-|-----------|------|-------|
-| Login page | `frontend/app/(auth)/login/page.tsx` | Client form, demo accounts, localStorage auth |
-| Auth service | `frontend/services/auth.service.ts` | `login()` fetch wrapper |
-| Auth helpers | `frontend/lib/auth.ts` | Role home paths, `canAccessRole()` |
-| Types | `frontend/types/auth.ts` | UserRole, LoginRequest, LoginResponse |
-
-**Demo accounts** (password: `Password123`):
-
-| Role | Email |
-|------|-------|
-| Patient | patient@smartcare.ai |
-| Doctor | doctor@smartcare.ai |
-| Admin | admin@smartcare.ai |
-
-### 3.2 Patient Management
-
-**Backend**
-
-| Component | File | Notes |
-|-----------|------|-------|
-| Patient routes | `backend/app/api/v1/patients.py` | Full CRUD + medical history |
-| Patient service | `backend/app/services/patient_service.py` | Business rules, duplicate detection, code generation |
-| Patient repository | `backend/app/repositories/patient_repository.py` | SQLAlchemy persistence |
-| Models | `backend/app/models/patient.py` | `Patient`, `PatientMedicalHistory` |
-| Schemas | `backend/app/schemas/patient.py` | Create, Update, Response, MedicalHistory |
-| Migration | `backend/app/database/migrations/20260617_0001_create_patients.py` | Alembic revision |
-| Tests | `backend/tests/test_patients.py` | Registration, search, profile, history, RBAC |
-
-**Frontend**
-
-| Component | File | Notes |
-|-----------|------|-------|
-| Patient dashboard | `frontend/app/(patient)/dashboard/page.tsx` | Profile summary cards |
-| Patient profile | `frontend/app/(patient)/profile/page.tsx` | Full profile display |
-| Medical records | `frontend/app/(patient)/medical-records/page.tsx` | Timeline of history |
-| Admin patient list | `frontend/app/(admin)/patients/page.tsx` | Search with pagination |
-| Register patient | `frontend/app/(admin)/patients/register/page.tsx` | Admin registration form |
-| Patient service | `frontend/services/patient.service.ts` | API client functions |
-| Utilities | `frontend/lib/patient.ts` | Name formatting, search matching |
-| Types | `frontend/types/patient.ts` | Patient, MedicalHistoryItem |
-| Tests | `frontend/tests/unit/patient.test.mjs` | Utility unit tests |
-
-### 3.3 Infrastructure (Partial)
-
-| Component | File | Notes |
-|-----------|------|-------|
-| App entry | `backend/app/main.py` | Registers auth + patient routers |
-| Config | `backend/app/core/config.py` | Pydantic settings from `.env` |
-| DB session | `backend/app/database/session.py` | SQLAlchemy engine + `get_db()` |
-| Docker Postgres | `docker/docker-compose.yml` | PostgreSQL 16 on port 5432 |
-| Env template | `.env.example` | API URL, DB, JWT, Gemini key placeholders |
+### Frontend (`frontend/`)
+- `app/`: Next.js App Router routes
+  - Route groups: `(auth)`, (patient), (doctor), (admin)
+  - Implemented pages exist for: login + patient dashboard/profile/records + admin patient management
+- `components/`: UI component folders (currently mostly placeholders)
+- `features/`: feature folders (currently mostly placeholders)
+- `services/`: frontend API clients (`*.service.ts`)
+- `lib/`: shared helpers (auth + formatting + small utilities)
+- `types/`: shared TypeScript types
+- `middleware.ts`: present but matcher is empty (no route protection)
 
 ---
 
-## 4. Pending Modules
+## 4. Database Models (SQLAlchemy)
 
-Based on `prd.md`, `project_context.md`, `ai_memory.md`, and gaps vs. `docs/structure.md`:
+> Notes: The repository currently models only a subset of the PRD database. Only `Patient`, `PatientMedicalHistory`, `Doctor`, `DoctorSchedule`, and `Appointment` tables are implemented.
 
-### 4.1 Phase 1 MVP (Core Hospital Operations)
+### `Patient` (`backend/app/models/patient.py`)
+- **Purpose**: Stores patient profile data and links to an auth user (optional `user_id`).
+- **Relationships**:
+  - `medical_history: relationship(PatientMedicalHistory)` via `patient_medical_history.patient_id` FK
+- **Important fields**:
+  - `id` (UUID string primary key)
+  - `patient_code` (unique, indexed)
+  - `user_id` (unique, nullable; links to auth identity)
+  - `phone` (unique, indexed)
+  - `email` (unique, nullable; indexed)
+  - `status` (default `Active`)
+  - `created_at`, `updated_at`
+- **Missing fields vs PRD (full EHR scope)**:
+  - No separate tables for allergies/conditions/contacts/insurance beyond basic fields
+  - No `patient type` (outpatient/inpatient) field
+  - No consent flags or document storage metadata
 
-| Module | Backend | Frontend | Database |
-|--------|---------|----------|----------|
-| Doctor Management | Not started | Not started | Not started |
-| Appointment Booking | Not started | Not started | Not started |
-| Queue Management | Not started | Not started | Not started |
-| Billing | Not started | Not started | Not started |
-| Medical Records (full EHR) | Partial (history only) | Partial (read-only timeline) | Partial |
+### `PatientMedicalHistory` (`backend/app/models/patient.py`)
+- **Purpose**: Stores consultation-style history records (a lightweight medical history timeline).
+- **Relationships**:
+  - Belongs to `Patient` (`patient_id` FK)
+- **Important fields**:
+  - `id` (UUID string primary key)
+  - `patient_id` (FK to `patients.id`, cascade delete)
+  - `visit_date`
+  - `doctor_name`, `department`
+  - `diagnosis`, optional `notes`
+  - `created_at`
+- **Missing fields vs PRD EHR**:
+  - No structured prescriptions
+  - No visit/entity separation (`visit_id`, `follow_up_date`, etc.)
+  - No attachment/document metadata
 
-### 4.2 Phase 2 — AI (Gemini)
+### `Doctor` (`backend/app/models/doctor.py`)
+- **Purpose**: Stores doctor profile details and links to auth user (optional).
+- **Relationships**:
+  - `schedules: relationship(DoctorSchedule)`
+- **Important fields**:
+  - `id` (UUID string primary key)
+  - `user_id` (unique, nullable; links to auth identity)
+  - `doctor_code` (unique, indexed)
+  - `email` / `phone` (unique, indexed)
+  - `specialization`, `department`
+  - `license_number` (unique, indexed)
+  - `consultation_fee` (Numeric)
+  - `is_available`, `status`
+  - `created_at`, `updated_at`
+- **Missing fields vs PRD**:
+  - No explicit `specialties` many-to-many, only one `specialization`
+  - No leave table (`doctor_leaves` planned)
+  - No workload/performance fields
 
-| Feature | Status |
-|---------|--------|
-| Smart Chatbot | Not started |
-| Medical Report Summarization | Not started |
-| Queue Waiting Time Prediction | Not started |
+### `DoctorSchedule` (`backend/app/models/doctor.py`)
+- **Purpose**: Stores weekly availability windows and slot parameters.
+- **Relationships**:
+  - Belongs to `Doctor` (`doctor_id` FK)
+- **Important fields**:
+  - `day_of_week` (int)
+  - `start_time`, `end_time`
+  - `slot_duration_minutes` (default 30)
+  - `max_patients` (default 16)
+  - `is_active`
+  - `created_at`, `updated_at`
+- **Missing fields vs PRD**:
+  - No overrides/room assignment
+  - No appointment status history
 
-### 4.3 Phase 3 — Advanced AI & Analytics
-
-| Feature | Status |
-|---------|--------|
-| Symptom Analyzer | Not started |
-| Doctor Workload Optimization | Not started |
-| No-show Prediction | Not started |
-| Analytics dashboards | Not started |
-
-### 4.4 Cross-Cutting (Planned, Not Built)
-
-- Refresh token / logout / forgot-password auth flows
-- Persistent `users` and `roles` tables in PostgreSQL
-- Next.js middleware route protection (matcher is empty)
-- Shared UI component library (`components/ui`, forms, tables, modals)
-- Notification service (SMS, email, WhatsApp)
-- Audit logging
-- Object storage for medical documents
-- Background workers (reminders, AI summaries, queue predictions)
-- CI/CD (GitHub Actions)
-- Full admin/doctor dashboards per wireframes
-
-**Next module** (per `ai_memory.md`): **Doctor Management**
-
----
-
-## 5. API Routes
-
-### 5.1 Implemented Routes
-
-All routes are prefixed with `/api/v1`.
-
-#### Authentication (`/auth`)
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/auth/login` | Public | Login; returns JWT + user |
-| GET | `/auth/me` | Patient, Doctor, Admin | Current authenticated user |
-| GET | `/auth/admin-only` | Admin only | RBAC verification endpoint |
-
-#### Patients (`/patients`)
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/patients` | Admin | Register new patient |
-| GET | `/patients` | Admin, Doctor | Search/list patients (`q`, `limit`, `offset`) |
-| GET | `/patients/me` | Patient | Get linked patient profile |
-| GET | `/patients/me/medical-history` | Patient | Own medical history |
-| GET | `/patients/{patient_id}` | Admin, Doctor | Get patient by ID |
-| PATCH | `/patients/{patient_id}` | Admin | Update patient |
-| POST | `/patients/{patient_id}/medical-history` | Admin, Doctor | Add history entry |
-| GET | `/patients/{patient_id}/medical-history` | Admin, Doctor | List history for patient |
-
-### 5.2 Planned Routes (from PRD / Architecture — Not Implemented)
-
-#### Auth (planned)
-
-- `POST /auth/logout`
-- `POST /auth/refresh-token`
-- `POST /auth/forgot-password`
-
-#### Doctors
-
-- `POST /doctors`, `GET /doctors`, `GET /doctors/{id}`, `PATCH /doctors/{id}`
-- `GET /doctors/{id}/schedule`, `POST /doctors/{id}/schedule`
-
-#### Appointments
-
-- `POST /appointments`, `GET /appointments`, `GET /appointments/{id}`, `PATCH /appointments/{id}`
-- `POST /appointments/{id}/cancel`, `POST /appointments/{id}/check-in`
-
-#### Queues
-
-- `GET /queues`, `GET /queues/{id}`, `POST /queues/tokens`
-- `PATCH /queues/tokens/{id}`, `POST /queues/{id}/call-next`
-- `GET /patients/{id}/queue-status`
-
-#### Billing
-
-- `POST /invoices`, `GET /invoices`, `GET /invoices/{id}`
-- `POST /invoices/{id}/payments`, `POST /invoices/{id}/refund`
-
-#### Medical Records (extended)
-
-- `POST /medical-records`, `GET /patients/{id}/medical-records`
-- `GET /medical-records/{id}`, `PATCH /medical-records/{id}`
-- `POST /medical-documents`
-
-#### AI
-
-- `POST /ai/symptom-analyzer`, `POST /ai/queue-wait-prediction`
-- `POST /ai/report-summary`, `POST /ai/chat`
-- `GET /ai/workload-recommendations`, `POST /ai/no-show-prediction`
-
-### 5.3 API Conventions
-
-**Implemented today**
-
-- Version prefix: `/api/v1`
-- Bearer JWT in `Authorization` header
-- Pydantic request/response validation
-- Role checks via `require_roles()`
-- Pagination on patient search (`limit` 1–100, `offset`)
-
-**Planned (documented, not enforced in code)**
-
-- Standard envelope: `{ success, data, message }` / `{ success: false, error: { code, message, details } }`
-- OpenAPI documentation (FastAPI auto-docs available at `/docs` when running)
-- Rate limiting on auth and AI endpoints
+### `Appointment` (`backend/app/models/appointment.py`)
+- **Purpose**: Stores appointment bookings between patient and doctor.
+- **Relationships**:
+  - FK-only fields exist (`patient_id`, `doctor_id`); there is no SQLAlchemy relationship currently defined to other appointment-related models.
+- **Important fields**:
+  - `id` (UUID string primary key)
+  - `appointment_code` (unique, indexed)
+  - `patient_id` (FK)
+  - `doctor_id` (FK)
+  - `appointment_datetime`
+  - `appointment_type` (default `In-person`)
+  - `status` (default `Scheduled`)
+  - `reason`, `cancellation_reason`
+  - `created_by`
+  - `created_at`, `updated_at`
+- **Important constraints**:
+  - Unique constraint `uq_active_doctor_appointment_slot` on `(doctor_id, appointment_datetime, status)`.
+- **Missing fields vs PRD**:
+  - No queue linkage/token table
+  - No full status lifecycle (only statuses used in code: Scheduled/Confirmed/Checked in/Rescheduled/Cancelled)
+  - No `no_show_risk_score`
 
 ---
 
-## 6. Database Schema
+## 5. Backend Architecture
 
-### 6.1 Implemented Tables (PostgreSQL)
+### Routers
+Implemented under `backend/app/api/v1/`:
+- `auth.py` (auth + RBAC demo route)
+- `patients.py` (patient CRUD + patient medical history endpoints)
+- `doctors.py` (doctor CRUD + schedules)
+- `appointments.py` (book, list, list slots, cancel, reschedule)
 
-#### `patients`
+### Services
+Implemented under `backend/app/services/`:
+- `auth_service.py`: validates credentials and issues JWT
+- `patient_service.py`: duplicate detection + patient code generation + history operations
+- `doctor_service.py`: CRUD and schedule handling (implied by repository usage; model exists)
+- `appointment_service.py`: slot listing from schedules + booking conflict checks + cancellation/reschedule
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | VARCHAR(36) | PK, UUID default |
-| patient_code | VARCHAR(32) | UNIQUE, indexed |
-| user_id | VARCHAR(64) | UNIQUE, nullable, indexed — links to auth user |
-| first_name | VARCHAR(100) | NOT NULL |
-| last_name | VARCHAR(100) | NOT NULL |
-| date_of_birth | DATE | NOT NULL |
-| gender | VARCHAR(32) | NOT NULL |
-| phone | VARCHAR(32) | UNIQUE, indexed |
-| email | VARCHAR(255) | UNIQUE, nullable, indexed |
-| address | TEXT | nullable |
-| emergency_contact | VARCHAR(255) | nullable |
-| blood_group | VARCHAR(8) | nullable |
-| insurance_provider | VARCHAR(120) | nullable |
-| insurance_number | VARCHAR(120) | nullable |
-| status | VARCHAR(32) | default `Active` |
-| created_at | TIMESTAMPTZ | server default |
-| updated_at | TIMESTAMPTZ | server default, on update |
+### Repositories
+Implemented under `backend/app/repositories/`:
+- `user_repository.py`: in-memory user store for demo accounts
+- `patient_repository.py`: SQLAlchemy persistence and search
+- `doctor_repository.py`: SQLAlchemy persistence and schedule CRUD
+- `appointment_repository.py`: SQLAlchemy persistence, conflict detection, schedule lookup, and slot availability derivation
 
-#### `patient_medical_history`
+### Authentication & RBAC
+- `backend/app/core/security.py`
+  - Password hashing: PBKDF2-SHA256 (custom helper)
+  - JWT creation/decoding using `python-jose`
+  - RBAC via `require_roles(*allowed_roles)` dependency
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | VARCHAR(36) | PK |
-| patient_id | VARCHAR(36) | FK → patients.id ON DELETE CASCADE, indexed |
-| visit_date | DATE | NOT NULL |
-| doctor_name | VARCHAR(160) | NOT NULL |
-| department | VARCHAR(120) | NOT NULL |
-| diagnosis | VARCHAR(255) | NOT NULL |
-| notes | TEXT | nullable |
-| created_at | TIMESTAMPTZ | server default |
+### Database
+- `backend/app/database/session.py` provides `get_db()` dependency
+- Alembic present; migrations live under `backend/app/database/migrations/`
 
-**Migration:** `20260617_0001` (Alembic revision in `backend/app/database/migrations/`)
-
-### 6.2 Not Yet Migrated (Planned per PRD / Architecture)
-
-| Group | Tables |
-|-------|--------|
-| Identity & Access | users, roles, permissions, role_permissions, user_sessions, password_reset_tokens |
-| Hospital Organization | branches, departments, rooms, services |
-| Patients (extended) | patient_contacts, patient_insurance, patient_allergies, patient_conditions |
-| Doctors | doctors, doctor_specialties, doctor_schedules, doctor_leaves |
-| Appointments | appointments, appointment_status_history, appointment_reminders |
-| Queues | queues, queue_tokens, queue_status_history |
-| Medical Records (full) | visits, medical_records, prescriptions, lab_orders, medical_documents, document_summaries |
-| Billing | invoices, invoice_items, payments, refunds, billing_adjustments |
-| AI | ai_interactions, ai_prompt_versions, ai_predictions, chatbot_sessions, chatbot_messages |
-| Audit | audit_logs, security_events, system_events |
-
-### 6.3 Database Tooling
-
-- **ORM:** SQLAlchemy 2.x with declarative models
-- **Migrations:** Alembic (`alembic.ini` present; one revision committed)
-- **Connection:** `DATABASE_URL` env var (default `postgresql+psycopg://postgres:postgres@localhost:5432/smartcare_ai`)
-- **Tests:** In-memory SQLite override in `test_patients.py`
+### Migrations
+- One primary migration exists for patient tables and history (`20260617_0001*` pattern).
+- Doctor and appointment migrations may exist depending on repository state (not fully enumerated here; see `backend/app/database/migrations/`).
 
 ---
 
-## 7. Frontend Pages
+## 6. Frontend Architecture
 
-### 7.1 Implemented Pages
+### Pages (Next.js App Router)
+Implemented routes present in repo:
+- Auth
+  - `/login` (`frontend/app/(auth)/login/page.tsx`)
+- Patient portal
+  - `/dashboard` (`frontend/app/(patient)/dashboard/page.tsx`)
+  - `/profile` (`frontend/app/(patient)/profile/page.tsx`)
+  - `/medical-records` (`frontend/app/(patient)/medical-records/page.tsx`)
+- Admin patient management
+  - `/patients` (`frontend/app/(admin)/patients/page.tsx`)
+  - `/patients/register` (`frontend/app/(admin)/patients/register/page.tsx`)
 
-| Route | File | Role | Description |
-|-------|------|------|-------------|
-| `/` | `app/page.tsx` | Public | Placeholder home ("SmartCare AI") |
-| `/login` | `app/(auth)/login/page.tsx` | Public | Sign-in form with demo accounts |
-| `/dashboard` | `app/(patient)/dashboard/page.tsx` | Patient* | Profile summary (ID, phone, blood group, insurance) |
-| `/profile` | `app/(patient)/profile/page.tsx` | Patient* | Detailed profile view |
-| `/medical-records` | `app/(patient)/medical-records/page.tsx` | Patient* | Medical history timeline |
-| `/patients` | `app/(admin)/patients/page.tsx` | Admin/Doctor* | Patient search list |
-| `/patients/register` | `app/(admin)/patients/register/page.tsx` | Admin* | Patient registration form |
+### Components / Layouts
+- `frontend/app/layout.tsx`, `globals.css` exist.
+- `frontend/components/` and `frontend/features/` folders exist but are largely placeholders in current tree.
 
-\*Route groups `(patient)` and `(admin)` do not add URL segments; **middleware does not enforce role-based routing** — protection is client-side via token presence and API RBAC.
+### Hooks
+- `frontend/hooks/` exists but no concrete hook files were enumerated in this run.
 
-### 7.2 Planned Pages (from Wireframes / Structure — Not Built)
+### API services
+- `frontend/services/auth.service.ts`, `patient.service.ts`, `doctor.service.ts`, `appointment.service.ts` exist (tree present; only auth/patient are confirmed by page usage).
 
-#### Patient Portal
+### Routing
+- No Next.js server-side route protection is enforced; `middleware.ts` exists but route matcher is empty.
+- Authorization is effectively “best effort” and relies on backend RBAC for correctness.
 
-| Route | Wireframe Section |
-|-------|-------------------|
-| `/appointments` | Appointment booking |
-| `/queue` | Queue status |
-| `/billing` | Bills & payments |
-| `/chatbot` | Smart assistant |
-
-#### Doctor Portal
-
-| Route | Wireframe Section |
-|-------|-------------------|
-| `/dashboard` (doctor) | Daily summary, queue, appointments |
-| `/queue` | Queue management |
-| `/appointments` | Today's schedule |
-| `/patients` | Patient lookup |
-| `/consultations` | Clinical notes workspace |
-| `/medical-records` | Report review |
-| `/workload` | Workload insights |
-
-#### Admin Portal
-
-| Route | Wireframe Section |
-|-------|-------------------|
-| `/dashboard` | KPI cards, operations overview |
-| `/doctors` | Doctor management |
-| `/appointments` | Appointment management |
-| `/queues` | Queue operations |
-| `/billing` | Billing management |
-| `/medical-records` | Records oversight |
-| `/ai-insights` | AI metrics |
-| `/settings` | Users, roles, departments |
-
-#### Auth (planned)
-
-- `/register`, `/forgot-password`
-
-### 7.3 UI Patterns in Use
-
-- **Mobile-first** Tailwind layouts (`max-w-*`, responsive grids)
-- **Client components** (`"use client"`) for all interactive pages
-- **Semantic HTML** with labels, `role="alert"`, `aria-live`
-- **Slate color palette** — no shared component library yet; inline Tailwind classes
-- **Auth state:** `localStorage` (not httpOnly cookies)
+### State management
+- Pages use local React `useState/useEffect` and browser `localStorage`.
 
 ---
 
-## 8. Coding Conventions
+## 7. Existing Features (Implemented vs Missing)
 
-### 8.1 Backend (Python / FastAPI)
+> Determined strictly from what exists in backend routes + frontend pages/components.
 
-| Convention | Practice in Repo |
-|------------|------------------|
-| Layering | Router → Service → Repository → Model |
-| Validation | Pydantic v2 schemas in `schemas/` |
-| DI | FastAPI `Depends()` for DB session and services |
-| Auth | `require_roles(UserRole.*)` dependency injection |
-| Errors | `HTTPException` with appropriate status codes (401, 403, 404, 409) |
-| IDs | UUID strings (36 chars) |
-| Password hashing | Custom PBKDF2-SHA256 (120k iterations in security module; demo users use 60k) |
-| JWT | python-jose, HS256 |
-| Config | pydantic-settings, `.env` file |
-| Tests | pytest + FastAPI TestClient; SQLite in-memory for patient tests |
-| Docstrings | Module-level docstrings on Python files |
+### Authentication
+- ✅ Complete (backend JWT + RBAC + frontend login)
 
-**Naming**
+### Patient Module
+- ✅ Complete (backend patient CRUD + medical history endpoints + frontend patient dashboard/profile/medical-records)
 
-- Files: `snake_case.py`
-- Classes: `PascalCase` (e.g., `PatientService`, `PatientRepository`)
-- Routes: RESTful, plural nouns (`/patients`, `/auth/login`)
+### Doctor Module
+- 🟡 Partially Implemented (backend doctor + schedule endpoints exist; frontend doctor UX not verified)
 
-### 8.2 Frontend (TypeScript / Next.js)
+### Appointment Module
+- 🟡 Partially Implemented (backend appointment + slots + cancel/reschedule exist; frontend booking UI not verified)
 
-| Convention | Practice in Repo |
-|------------|------------------|
-| Framework | Next.js 15 App Router |
-| Components | Default server components; `"use client"` when state/effects needed |
-| Route groups | `(auth)`, `(patient)`, `(admin)` for organization |
-| API calls | `services/*.service.ts` with `fetch()` |
-| Config | `lib/config.ts` — `NEXT_PUBLIC_API_URL` |
-| Types | Dedicated `types/` directory, exported types (not interfaces in services) |
-| Styling | Tailwind CSS utility classes |
-| Path alias | `@/` → project root (tsconfig paths) |
-| Tests | Node `assert` in `.mjs` files (mirrors lib logic, not full component tests) |
-| Auth storage | `localStorage` keys: `smartcare_token`, `smartcare_user` |
+### Queue Management
+- ❌ Missing (no queue APIs/models/frontend)
 
-**Naming**
+### Billing
+- ❌ Missing (no billing APIs/models/frontend)
 
-- Files: `kebab-case` for routes, `camelCase.ts` for utilities, `*.service.ts` for API layer
-- Functions: `camelCase` (e.g., `getMyPatientProfile`, `formatPatientName`)
-- Types: `PascalCase` (e.g., `Patient`, `UserRole`)
+### Dashboard (basic)
+- 🟡 Partially Implemented (patient dashboard exists; admin/doctor dashboards not present as pages)
 
-### 8.3 Cross-Cutting Standards (from `skills.md` — Target)
+### AI Features
+- ❌ Missing (no Gemini integration in codebase yet)
 
-These are **documented expectations**; adoption varies in current code:
+### Inventory / Laboratory
+- ❌ Missing
 
-- Clean architecture with domain boundaries
-- No secrets in code — use environment variables
-- WCAG 2.1 AA accessibility
-- Consistent loading, empty, and error states (partially implemented)
-- Unit tests for critical business logic (backend: yes; frontend: utility-only)
-- API versioning under `/api/v1`
-- AI calls isolated behind backend integration layer (not yet applicable)
-
-### 8.4 Git & Project Docs
-
-| File | Purpose |
-|------|---------|
-| `skills.md` | Engineering standards, tech stack, definition of done |
-| `prd.md` | Full product requirements, roles, APIs, MVP phases |
-| `docs/architecture.md` | System design, service map, planned folder layout |
-| `docs/ui_wireframes.md` | UI wireframes for patient, doctor, admin dashboards |
-| `docs/structure.md` | Target repository tree (aspirational) |
-| `project_context.md` | Quick status: completed vs pending |
-| `ai_memory.md` | Session progress notes for AI agents |
+### Notifications
+- ❌ Missing
 
 ---
 
-## 9. Environment & Local Development
+## 8. Current APIs (Backend)
 
-### 9.1 Required Environment Variables
+> Grouped by module. Prefix is `/api/v1`.
 
-From `.env.example`:
+### Authentication (`backend/app/api/v1/auth.py`)
+- `POST /auth/login`
+- `GET /auth/me`
+- `GET /auth/admin-only` (RBAC demo route)
 
-```
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-APP_ENV=development
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/smartcare_ai
-JWT_SECRET=change-me
-GEMINI_API_KEY=change-me
-```
+### Patients (`backend/app/api/v1/patients.py`)
+- `POST /patients` (admin)
+- `GET /patients` (admin/doctor search)
+- `GET /patients/me` (patient)
+- `GET /patients/me/medical-history` (patient)
+- `GET /patients/{patient_id}` (admin/doctor)
+- `PATCH /patients/{patient_id}` (admin)
+- `POST /patients/{patient_id}/medical-history` (admin/doctor)
+- `GET /patients/{patient_id}/medical-history` (admin/doctor)
 
-### 9.2 Running Locally (Typical)
+### Doctors (`backend/app/api/v1/doctors.py`)
+- `POST /doctors` (admin)
+- `GET /doctors` (admin/doctor/patient)
+- `GET /doctors/me` (doctor)
+- `GET /doctors/me/schedule` (doctor)
+- `GET /doctors/{doctor_id}` (admin/doctor/patient)
+- `PATCH /doctors/{doctor_id}` (admin)
+- `POST /doctors/{doctor_id}/schedule` (admin)
+- `GET /doctors/{doctor_id}/schedule` (admin/doctor/patient)
 
-1. Start PostgreSQL: `docker compose -f docker/docker-compose.yml up -d`
-2. Run Alembic migration: apply `20260617_0001`
-3. Backend: `uvicorn app.main:app --reload` from `backend/`
-4. Frontend: `npm run dev` from `frontend/`
-
-### 9.3 Test Commands
-
-| Scope | Command |
-|-------|---------|
-| Backend | `pytest` from `backend/` |
-| Frontend | `npm test` (runs unit tests in `tests/unit/`) |
+### Appointments (`backend/app/api/v1/appointments.py`)
+- `POST /appointments` (admin/doctor/patient)
+- `GET /appointments` (admin/doctor/patient)
+- `GET /appointments/slots?doctor_id=&slot_date=` (admin/doctor/patient)
+- `GET /appointments/{appointment_id}` (admin/doctor/patient)
+- `POST /appointments/{appointment_id}/cancel` (admin/doctor/patient)
+- `POST /appointments/{appointment_id}/reschedule` (admin/doctor/patient)
 
 ---
 
-## 10. Summary
+## 9. Current Frontend Pages
 
-SmartCare AI is an early-stage hospital management platform with a **clear architectural vision** (modular monolith, clean layers, JWT + RBAC, PostgreSQL) and **two working domains**: **Authentication** and **Patient Management**. The backend exposes 11 patient-related endpoints plus 3 auth endpoints; the frontend provides login, patient self-service pages, and admin patient registration/search. Everything else in the PRD — doctors, appointments, queues, billing, full EHR, AI features, analytics, and shared UI infrastructure — remains **planned and documented but not implemented**. The next development priority is **Doctor Management** per project memory files.
+### Auth
+- `/login`
+
+### Patient
+- `/dashboard`
+- `/profile`
+- `/medical-records`
+
+### Admin
+- `/patients`
+- `/patients/register`
+
+### Doctor
+- No doctor portal pages verified in current tree during this analysis run.
+
+---
+
+## 10. Current Database Tables
+
+Implemented SQLAlchemy tables correspond to these current models:
+- `patients`
+- `patient_medical_history`
+- `doctors`
+- `doctor_schedules`
+- `appointments`
+
+---
+
+## 11. Existing Tests
+
+### Backend tests
+- `backend/tests/test_auth.py`
+  - login success + invalid credentials
+  - RBAC allow/deny checks
+- `backend/tests/test_patients.py`
+  - admin patient registration
+  - RBAC patient/doctor/admin behavior
+  - medical history create/read flows
+- `backend/tests/test_doctors.py`
+  - admin doctor creation
+  - schedule creation and reading
+  - RBAC checks and doctor schedule access
+- `backend/tests/test_appointments.py`
+  - list available slots from schedules
+  - patient booking and calendar listing
+  - double-booking conflict detection
+  - cancel/reschedule behavior
+  - booking outside schedule rejection
+
+### Frontend tests
+- Present as unit tests folder; specific coverage beyond helper tests not verified in this run.
+
+---
+
+## 12. Technical Debt & Gaps
+
+### Duplicate / missing modules
+- PRD and `docs/architecture.md` describe many modules (queue, billing, AI, audit logs), but the codebase only implements auth/patients and partial doctor/appointments.
+
+### Dead/placeholder code
+- `frontend/components/*` and `frontend/features/*` exist mostly as empty `.gitkeep` directories.
+
+### Missing validation / feature parity
+- Queue, billing, AI, and full EHR are missing entirely.
+- `frontend/middleware.ts` exists but does not enforce route protection.
+
+### Security issues (current)
+- Auth token stored in `localStorage` (higher XSS risk than httpOnly cookies).
+- Demo users in-memory (`UserRepository`) instead of persistent identity in PostgreSQL.
+
+### Performance issues
+- Current backend uses synchronous SQLAlchemy calls with simple search; acceptable for MVP.
+- Slot availability generation derives slots dynamically per request; ok for MVP but may require indexing/optimization later.
+
+### Architecture issues
+- Frontend uses client-side checks and relies on backend RBAC; lack of server route protection can degrade UX.
+- Backend uses “name strings” in medical history (`doctor_name`, `department`) rather than foreign keys to doctor/department entities (breaks normalization vs PRD).
+
+---
+
+## 13. Roadmap Progress (vs `ROADMAP.md`)
+
+> This table maps documented roadmap modules to current code reality.
+
+| Module | Progress |
+|---|---|
+| Authentication | ✅ 100% |
+| Patient Module | ✅ 100% |
+| Doctor Module | 🟡 Backend exists; full frontend/module UX incomplete |
+| Appointment Module | 🟡 Backend exists; full frontend integration incomplete |
+| Queue Management | ❌ Missing |
+| Billing | ❌ Missing |
+| Medical Records (Full EHR) | ❌ Missing (only medical history timeline implemented) |
+| Deployment | 🟡 Docker exists for backend DB; full release pipeline not present |
+| Testing | 🟡 Backend tests exist; frontend coverage not verified beyond helpers |
+| AI Features | ❌ Missing |
+
+---
+
+## 14. NEXT_STEPS.md (Milestones)
+
+### Milestone 1 — Doctor Management UX + Data Integrity
+- **Estimated difficulty**: M
+- **Dependencies**: Auth + Patient done; Doctor backend exists
+- **Files likely to change**:
+  - `frontend/app/(doctor)/*` (add pages)
+  - `frontend/components/*` (UI for doctor screens)
+  - `frontend/services/doctor.service.ts` (API integration)
+  - `backend/app/models/*`, `backend/app/api/v1/doctors.py` (if normalization is required)
+- **Acceptance criteria**:
+  - Doctor role can access doctor portal pages
+  - Doctor can view/edit profile + manage schedules
+  - RBAC-protected flows validated end-to-end
+
+### Milestone 2 — Appointment Booking + Patient Scheduling UX
+- **Estimated difficulty**: L
+- **Dependencies**: Doctor + Appointment backend exists
+- **Files likely to change**:
+  - `frontend/app/(patient)/appointments/*` (new pages)
+  - `frontend/services/appointment.service.ts`
+  - Tailwind UI components for slot selection
+- **Acceptance criteria**:
+  - Patient can list available slots for a doctor
+  - Patient can book/cancel/reschedule appointments
+  - Calendar/list pages reflect backend state
+
+### Milestone 3 — Queue Management (MVP demo)
+- **Estimated difficulty**: L
+- **Dependencies**: Appointment lifecycle
+- **Files likely to change**:
+  - Backend: new models + endpoints under `/api/v1/queues*` and `/patients/*/queue-status`
+  - Frontend: `/queue` pages for patient and doctor
+- **Acceptance criteria**:
+  - Walk-in tokens or token creation after appointment check-in
+  - Call-next workflow and patient queue position updates
+
+### Milestone 4 — Billing (Invoices + payments)
+- **Estimated difficulty**: L
+- **Dependencies**: Patient (and optionally appointment)
+- **Files likely to change**:
+  - Backend: billing models + `/api/v1/invoices*`
+  - Frontend: patient billing pages + invoice views
+- **Acceptance criteria**:
+  - Invoice creation and list
+  - Payment recording and status updates
+
+### Milestone 5 — Full Medical Records / EHR Expansion
+- **Estimated difficulty**: L
+- **Dependencies**: Appointments/Visits
+- **Files likely to change**:
+  - Backend: visits/records/prescriptions/lab order/document tables + endpoints
+  - Frontend: EHR timeline + record viewer
+- **Acceptance criteria**:
+  - Patient timeline includes structured visits and documents
+  - Doctor can create/update clinical notes linked to entities
+
+### Milestone 6 — AI Layer (Phase 2)
+- **Estimated difficulty**: XL
+- **Dependencies**: Gemini integration layer + storage
+- **Files likely to change**:
+  - Backend: `/api/v1/ai/*` endpoints + Gemini adapter
+  - Frontend: chatbot and report summary UI
+- **Acceptance criteria**:
+  - AI endpoints exist behind backend (not direct from UI)
+  - Safety/disclaimer present
+  - AI outputs are auditable
+
+### Milestone 7 — Analytics + Portals + Deployment hardening
+- **Estimated difficulty**: L+M
+- **Dependencies**: operational modules (appointments/queue/billing)
+- **Files likely to change**:
+  - Frontend: admin dashboards
+  - Backend: analytics endpoints (optional MVP with mocks)
+  - Deployment: migration-on-release + env docs
+- **Acceptance criteria**:
+  - Admin KPIs visible
+  - Dashboard data matches operational flows
+
+---
+
+*End of document.*
+
